@@ -112,7 +112,7 @@ Tool_for_ubuntu() {
     #metasploit
     if ! command -v msfvenom &>/dev/null; then
         echo -e "\e[31mNow installing metasploit....\e[0m"
-        curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb >~/Tools/msfinstall && chmod 755 ~/Tools/msfinstall && .~/Tools/msfinstall
+        curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb >~/Tools/msfinstall && chmod 755 ~/Tools/msfinstall && .~/Tools
     else
         echo -e "\e[32mmetasploit is already installed\e[0m"
     fi

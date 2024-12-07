@@ -111,10 +111,13 @@ Tool_for_ubuntu() {
 
     #metasploit
     if ! command -v msfvenom &>/dev/null; then
-        echo -e "\e[31mNow installing metasploit....\e[0m"
-        curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb >~/Tools/msfinstall && chmod 755 ~/Tools/msfinstall && .~/Tools
+        echo -e "\e[31mNow installing Metasploit...\e[0m"
+        mkdir -p ~/Tools # Ensure ~/Tools directory exists
+        curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb -o ~/Tools/msfinstall
+        chmod 755 ~/Tools/msfinstall # Make the installer executable
+        ~/Tools/msfinstall           # Run the installer
     else
-        echo -e "\e[32mmetasploit is already installed\e[0m"
+        echo -e "\e[32mMetasploit is already installed.\e[0m"
     fi
 
     #checking wpscan

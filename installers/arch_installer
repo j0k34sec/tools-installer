@@ -1,0 +1,913 @@
+#!/bin/bash
+
+# Define log file and colors
+LOG_FILE="$HOME/Tools/arch_install_errors.log"
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+MAGENTA="\e[35m"
+CYAN="\e[36m"
+BOLD="\e[1m"
+RESET="\e[0m"
+
+# Function to print an Arch-themed banner
+print_arch_banner() {
+    clear
+    echo -e "${BOLD}${CYAN}"
+    echo '           /\                            '
+    echo '          /  \                           '
+    echo '         /    \                          '
+    echo '        /      \       _____             '
+    echo '       /   /\   \     |  __ \            '
+    echo '      /   /  \   \    | |__) |           '
+    echo '     /   /    \   \   |  _  /            '
+    echo '    /   /      \   \  | | \ \            '
+    echo '   /   /   /\   \   \ |_|  \_\           '
+    echo '  /   /   /  \   \   \                  '
+    echo ' /   /   /    \   \   \                 '
+    echo '/___/___/      \___\___\                '
+    echo -e "${RESET}\n"
+    echo -e "${BOLD}${BLUE}  J0K34SEC Arch Linux Tools Installer${RESET}\n"
+    echo -e "${CYAN}===================================================${RESET}\n"
+    sleep 1
+}
+
+# Function for spinner animation
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\\'
+    local message="$2"
+    
+    tput civis  # Hide cursor
+    
+    while ps -p $pid > /dev/null 2>&1; do
+        local temp=${spinstr#?}
+        printf " ${CYAN}${BOLD}[%c]${RESET} ${BOLD}%s${RESET}\r" "$spinstr" "$message"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+    done
+    
+    printf "   ${GREEN}${BOLD}[✓]${RESET} ${BOLD}%s${RESET}\n" "$message"
+    tput cnorm  # Show cursor
+}
+
+# Function to show progress bar
+show_progress() {
+    local current=$1
+    local total=$2
+    local message="$3"
+    local bar_size=30
+    
+    # Calculate percentage and number of filled/empty blocks
+    local percent=$((current * 100 / total))
+    local filled=$((current * bar_size / total))
+    local empty=$((bar_size - filled))
+    
+    # Create the bar
+    local bar=""
+    for ((i=0; i<filled; i++)); do
+        bar="${bar}█"
+    done
+    for ((i=0; i<empty; i++)); do
+        bar="${bar}░"
+    done
+    
+    # Print the progress bar
+    printf "${CYAN}[${BLUE}%-${bar_size}s${CYAN}]${RESET} ${BOLD}%3d%%${RESET} %s\r" "$bar" "$percent" "$message"
+    
+    # Print newline if completed
+    if [ "$current" -eq "$total" ]; then
+        echo -e "\n${GREEN}${BOLD}[✓] Completed: ${message}${RESET}\n"
+    fi
+}
+
+# Function to display a section header
+display_section() {
+    local title="$1"
+    echo -e "\n${BOLD}${MAGENTA}◉ ${title} ${RESET}"
+    echo -e "${CYAN}$(printf '%.0s─' {1..50})${RESET}"
+}
+
+# Function to log messages with enhanced visuals
+log_message() {
+    local message="$1"
+    local type="$2"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    
+    # Save to log file without formatting
+    echo "[$timestamp] [$type] $message" >> "$LOG_FILE"
+    
+    # Display formatted message on screen
+    case "$type" in
+        "error")
+            echo -e "${BOLD}${RED}[✗] ERROR:${RESET} $message"
+            ;;
+        "warning")
+            echo -e "${BOLD}${YELLOW}[!] WARNING:${RESET} $message"
+            ;;
+        "success")
+            echo -e "${BOLD}${GREEN}[✓] SUCCESS:${RESET} $message"
+            ;;
+        "info")
+            echo -e "${BOLD}${BLUE}[ℹ] INFO:${RESET} $message"
+            ;;
+        "step")
+            echo -e "\n${CYAN}➤ ${BOLD}$message${RESET}"
+            echo -e "${CYAN}$(printf '%.0s-' {1..50})${RESET}"
+            ;;
+        *)
+            echo -e "$message"
+            ;;
+    esac
+}
+
+# Function to check if command exists
+check_command() {
+    local cmd="$1"
+    if command -v "$cmd" &>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to run command with error handling and animation
+run_command() {
+    local cmd="$1"
+    local error_msg="$2"
+    local success_msg="$3"
+    local show_spinner="${4:-true}"
+    
+    if [ "$show_spinner" = true ]; then
+        # Run command in background and show spinner
+        eval "$cmd" > /dev/null 2>> "$LOG_FILE" & 
+        local cmd_pid=$!
+        spinner $cmd_pid "${success_msg}..."
+        wait $cmd_pid
+        local status=$?
+    else
+        # Run command normally
+        eval "$cmd"
+        local status=$?
+    fi
+    
+    if [ $status -eq 0 ]; then
+        if [ -n "$success_msg" ] && [ "$show_spinner" != true ]; then
+            log_message "$success_msg" "success"
+        fi
+        return 0
+    else
+        if [ -n "$error_msg" ]; then
+            log_message "$error_msg" "error"
+        fi
+        return 1
+    fi
+}
+
+arch_tools_installer() {
+    # Show the Arch banner
+    print_arch_banner
+    
+    log_message "Installing Tools for Arch Linux" "step"
+    
+    # Create log file
+    > "$LOG_FILE"
+    
+    # Check for sudo access
+    if ! sudo -v &>/dev/null; then
+        log_message "This script requires sudo privileges to install packages" "error"
+        log_message "Please run with sudo or grant sudo privileges to continue" "warning"
+        return 1
+    fi
+
+    # Initialize progress tracking
+    TOTAL_STEPS=20  # Approximate number of installation steps
+    CURRENT_STEP=0
+    
+    # Make sure pacman is updated (with error handling to prevent hanging)
+    log_message "Updating package database..." "step"
+    show_progress $CURRENT_STEP $TOTAL_STEPS "Initializing package manager"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    
+    # Run the pacman update with a spinner animation
+    {
+        sudo pacman -Syu --noconfirm --noprogressbar --needed
+        update_status=$?
+    } & spinner $! "Updating package database"
+    
+    if [ $update_status -ne 0 ]; then
+        log_message "Pacman update failed, continuing with installation..." "warning"
+    else
+        log_message "Package database updated successfully" "success"
+    fi
+    
+    show_progress $CURRENT_STEP $TOTAL_STEPS "Package database updated"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+
+    # Install base development tools if not already installed
+    if ! pacman -Q base-devel &>/dev/null; then
+        log_message "Installing base development tools..." "info"
+        run_command "sudo pacman -S --noconfirm --noprogressbar --needed base-devel" \
+            "Base-devel installation failed, some tools may not build correctly" \
+            "Base development tools installed successfully"
+    else
+        log_message "Base development tools are already installed" "success"
+    fi
+
+    # Install git if not already installed
+    if ! check_command "git"; then
+        log_message "Installing git..." "info"
+        run_command "sudo pacman -S --noconfirm --noprogressbar --needed git" \
+            "Git installation failed, version control operations will not work" \
+            "Git installed successfully"
+    else
+        log_message "Git is already installed" "success"
+    fi
+
+    # Install python if not already installed
+    if ! check_command "python3"; then
+        log_message "Installing python..." "info"
+        run_command "sudo pacman -S --noconfirm --noprogressbar --needed python python-pip" \
+            "Python installation failed, python-based tools will not work" \
+            "Python installed successfully"
+    else
+        log_message "Python is already installed" "success"
+        # Check Python version
+        PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+        log_message "Python version: $PYTHON_VERSION" "info"
+    fi
+
+    # Install feroxbuster
+    if ! check_command "feroxbuster"; then
+        log_message "Installing feroxbuster..." "info"
+        # Check if yay is installed (AUR helper)
+        if check_command "yay"; then
+            run_command "yay -S --noconfirm feroxbuster" \
+                "Failed to install feroxbuster using yay" \
+                "Feroxbuster installed successfully using yay"
+        else
+            log_message "Yay not found, installing feroxbuster manually from GitHub release" "info"
+            # Make sure wget is installed
+            if ! check_command "wget"; then
+                run_command "sudo pacman -S --noconfirm wget" "Failed to install wget" "Wget installed"
+            fi
+            
+            # Create a temp directory for the download
+            TMP_DIR=$(mktemp -d)
+            cd "$TMP_DIR" || {
+                log_message "Failed to create temporary directory for feroxbuster download" "error"
+                return 1
+            }
+            
+            # Download and install feroxbuster
+            run_command "wget https://github.com/epi052/feroxbuster/releases/download/v2.10.4/x86_64-linux-feroxbuster.tar.gz" \
+                "Failed to download feroxbuster" \
+                "Downloaded feroxbuster successfully"
+                
+            run_command "tar -xf x86_64-linux-feroxbuster.tar.gz" "Failed to extract feroxbuster" "Extracted feroxbuster"
+            run_command "chmod +x feroxbuster" "Failed to set executable permissions on feroxbuster" "Set permissions on feroxbuster"
+            run_command "sudo mv feroxbuster /usr/local/bin" "Failed to install feroxbuster to /usr/local/bin" "Moved feroxbuster to /usr/local/bin"
+            run_command "rm -rf $TMP_DIR" "Failed to clean up temporary files" "Cleaned up temporary files"
+        fi
+        
+        # Verify installation
+        if check_command "feroxbuster"; then
+            log_message "Feroxbuster installed successfully" "success"
+        else
+            log_message "Feroxbuster installation failed" "error"
+        fi
+    else
+        log_message "Feroxbuster is already installed" "success"
+    fi
+
+    # Install paramspider
+    # Check if paramspider is already working properly
+    if ! (command -v paramspider &>/dev/null && paramspider -h &>/dev/null); then
+        echo -e "\e[31mparamspider is not installed. Now installing paramspider...\e[0m"
+        git clone https://github.com/devanshbatham/ParamSpider.git ~/Tools/ParamSpider
+        
+        # Check if python-setuptools is installed, if not install it
+        if ! pacman -Q python-setuptools &>/dev/null; then
+            echo -e "\e[31mInstalling python-setuptools...\e[0m"
+            sudo pacman -S --noconfirm --noprogressbar --needed python-setuptools
+        fi
+        
+        # Install in a virtual environment
+        python3 -m venv ~/Tools/ParamSpider/venv
+        source ~/Tools/ParamSpider/venv/bin/activate
+        pip install setuptools
+        python ~/Tools/ParamSpider/setup.py install
+        deactivate
+        
+        # Create wrapper script for paramspider
+        echo '#!/bin/bash' > ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo 'source ~/Tools/ParamSpider/venv/bin/activate' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo '~/Tools/ParamSpider/venv/bin/python ~/Tools/ParamSpider/paramspider/main.py "$@"' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo 'deactivate' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        chmod +x ~/Tools/ParamSpider/paramspider_wrapper.sh
+        
+        # Create a symlink to the wrapper script
+        sudo ln -sf ~/Tools/ParamSpider/paramspider_wrapper.sh /usr/local/bin/paramspider
+    else
+        echo -e "\e[32mparamspider is already installed..\e[0m"
+    fi
+
+    # Install XSStrike
+    # Check if XSStrike is already working properly
+    if command -v xsstrike &>/dev/null && xsstrike -h &>/dev/null; then
+        echo -e "\e[32mXSStrike is already installed and working properly.\e[0m"
+    else
+        echo -e "\e[31mXSStrike not installed. Now installing XSStrike....\e[0m"
+        git clone https://github.com/s0md3v/XSStrike.git ~/Tools/XSStrike
+        
+        # Create and use virtual environment for XSStrike
+        python3 -m venv ~/Tools/XSStrike/venv
+        source ~/Tools/XSStrike/venv/bin/activate
+        pip install -r ~/Tools/XSStrike/requirements.txt
+        deactivate
+        
+        chmod +x ~/Tools/XSStrike/xsstrike.py
+        # Create wrapper script for XSStrike
+        echo '#!/bin/bash' > ~/Tools/XSStrike/xsstrike_wrapper.sh
+        echo 'source ~/Tools/XSStrike/venv/bin/activate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+        echo 'python ~/Tools/XSStrike/xsstrike.py "$@"' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+        echo 'deactivate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+        chmod +x ~/Tools/XSStrike/xsstrike_wrapper.sh
+        echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
+    fi
+
+    # Install sqlmap
+    if ! command -v sqlmap &>/dev/null; then
+        echo -e "\e[31msqlmap is not installed. Now installing sqlmap...\e[0m"
+        sudo pacman -S --noconfirm --noprogressbar --needed sqlmap || echo "Sqlmap installation failed, continuing..."
+    else
+        echo -e "\e[32msqlmap is already installed...\e[0m"
+    fi
+    
+    # Install SecLists wordlists collection
+    display_section "INSTALLING SECLISTS WORDLISTS"
+    if [ ! -d "/usr/share/wordlists/SecLists" ]; then
+        log_message "SecLists not found. Installing SecLists wordlists collection..." "step"
+        
+        # Make sure the wordlists directory exists
+        if [ ! -d "/usr/share/wordlists" ]; then
+            run_command "sudo mkdir -p /usr/share/wordlists" \
+                "Failed to create wordlists directory" \
+                "Created wordlists directory"
+        fi
+        
+        # Clone SecLists repository
+        {
+            # Clone with depth=1 to save space and time
+            sudo git clone --depth 1 https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists
+            clone_status=$?
+        } & spinner $! "Downloading SecLists wordlists collection"
+        
+        if [ $clone_status -eq 0 ]; then
+            log_message "SecLists installed successfully in /usr/share/wordlists/SecLists" "success"
+            
+            # Set proper permissions
+            run_command "sudo chmod -R 755 /usr/share/wordlists/SecLists" \
+                "Failed to set permissions on SecLists" \
+                "Set proper permissions on SecLists"
+                
+            # Create a symlink to common wordlists for easy access
+            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Discovery/Web-Content/common.txt /usr/share/wordlists/common.txt" \
+                "Failed to create symlink to common wordlist" \
+                "Created symlink to common wordlist"
+                
+            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt /usr/share/wordlists/rockyou.txt" \
+                "Failed to create symlink to rockyou wordlist" \
+                "Created symlink to rockyou wordlist"
+        else
+            log_message "Failed to install SecLists. You can install it manually with:" "error"
+            log_message "sudo git clone https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists" "info"
+        fi
+    else
+        log_message "SecLists is already installed in /usr/share/wordlists/SecLists" "success"
+        
+        # Update existing SecLists if it's a git repository
+        if [ -d "/usr/share/wordlists/SecLists/.git" ]; then
+            log_message "Updating existing SecLists installation..." "info"
+            {
+                sudo git -C /usr/share/wordlists/SecLists pull
+                update_status=$?
+            } & spinner $! "Updating SecLists to latest version"
+            
+            if [ $update_status -eq 0 ]; then
+                log_message "SecLists updated successfully" "success"
+            else
+                log_message "Failed to update SecLists" "warning"
+            fi
+        fi
+    fi
+
+    # Install ghauri
+    # Check if ghauri is already working properly
+    if ! (command -v ghauri &>/dev/null && ghauri --help &>/dev/null); then
+        echo -e "\e[31mghauri is not installed. Now installing ghauri....\e[0m"
+        git clone https://github.com/r0oth3x49/ghauri.git ~/Tools/ghauri
+        
+        # Create and use virtual environment for ghauri
+        python3 -m venv ~/Tools/ghauri/venv
+        source ~/Tools/ghauri/venv/bin/activate
+        pip install setuptools
+        pip install -r ~/Tools/ghauri/requirements.txt
+        python ~/Tools/ghauri/setup.py install
+        
+        # Create a symlink to make it accessible
+        sudo ln -sf ~/Tools/ghauri/venv/bin/ghauri /usr/local/bin/ghauri
+        deactivate
+    else
+        echo -e "\e[32mghauri is already installed\e[0m"
+    fi
+
+    # Install waymore
+    # Check if waymore is already working properly
+    if ! (command -v waymore &>/dev/null && waymore -h &>/dev/null); then
+        echo -e "\e[31mwaymore is not installed. Now installing waymore...\e[0m"
+        git clone https://github.com/xnl-h4ck3r/waymore.git ~/Tools/waymore
+        
+        # Create and use virtual environment for waymore
+        python3 -m venv ~/Tools/waymore/venv
+        source ~/Tools/waymore/venv/bin/activate
+        pip install setuptools
+        pip install -r ~/Tools/waymore/requirements.txt
+        python ~/Tools/waymore/setup.py install
+        deactivate
+        
+        # Create wrapper script for waymore
+        echo '#!/bin/bash' > ~/Tools/waymore/waymore_wrapper.sh
+        echo 'source ~/Tools/waymore/venv/bin/activate' >> ~/Tools/waymore/waymore_wrapper.sh
+        echo '~/Tools/waymore/venv/bin/python -m waymore "$@"' >> ~/Tools/waymore/waymore_wrapper.sh
+        echo 'deactivate' >> ~/Tools/waymore/waymore_wrapper.sh
+        chmod +x ~/Tools/waymore/waymore_wrapper.sh
+        
+        # Create a symlink to the wrapper script
+        sudo ln -sf ~/Tools/waymore/waymore_wrapper.sh /usr/local/bin/waymore
+    else
+        echo -e "\e[32mwaymore is already installed\e[0m"
+    fi
+
+    # Install creepyCrawler
+    # Check if creepyCrawler is already working properly
+    if command -v creepycrawler &>/dev/null && [ -f "$HOME/Tools/creepyCrawler/creepyCrawler.py" ]; then
+        echo -e "\e[32mcreepyCrawler is already installed and working properly.\e[0m"
+    else
+        echo -e "\e[31mNow installing creepyCrawler...\e[0m"
+        git clone https://github.com/chm0dx/creepyCrawler.git ~/Tools/creepyCrawler
+        
+        # Create and use virtual environment for creepyCrawler
+        python3 -m venv ~/Tools/creepyCrawler/venv
+        source ~/Tools/creepyCrawler/venv/bin/activate
+        pip install -r ~/Tools/creepyCrawler/requirements.txt
+        deactivate
+        
+        chmod +x ~/Tools/creepyCrawler/creepyCrawler.py
+        # Create wrapper script for creepyCrawler
+        echo '#!/bin/bash' > ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+        echo 'source ~/Tools/creepyCrawler/venv/bin/activate' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+        echo 'python ~/Tools/creepyCrawler/creepyCrawler.py "$@"' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+        echo 'deactivate' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+        chmod +x ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+    fi
+
+    # Install ffuf
+    if ! command -v ffuf &>/dev/null; then
+        echo -e "\e[31mffuf not installed. Now installing ffuf\e[0m"
+        # Check if yay is installed (AUR helper)
+        if command -v yay &>/dev/null; then
+            yay -S --noconfirm ffuf
+        else
+            # Install Go if not already installed
+            if ! command -v go &>/dev/null; then
+                sudo pacman -S --noconfirm --noprogressbar --needed go || echo "Go installation failed, continuing..."
+            fi
+            go install github.com/ffuf/ffuf@latest
+            sudo cp ~/go/bin/ffuf /usr/local/bin/
+        fi
+    else
+        echo -e "\e[32mffuf already installed...\e[0m"
+    fi
+
+    # Install SSRFmap
+    # Check if SSRFmap is already working properly
+    if command -v ssrfmap &>/dev/null && [ -f "$HOME/Tools/SSRFmap/ssrfmap.py" ]; then
+        echo -e "\e[32mSSRFmap is already installed and working properly.\e[0m"
+    else
+        echo -e "\e[31mSSRFmap Now installing....\e[0m"
+        git clone https://github.com/swisskyrepo/SSRFmap.git ~/Tools/SSRFmap/
+        
+        # Create and use virtual environment for SSRFmap
+        python3 -m venv ~/Tools/SSRFmap/venv
+        source ~/Tools/SSRFmap/venv/bin/activate
+        pip install -r ~/Tools/SSRFmap/requirements.txt
+        deactivate
+        
+        chmod +x ~/Tools/SSRFmap/ssrfmap.py
+        # Create wrapper script for SSRFmap
+        echo '#!/bin/bash' > ~/Tools/SSRFmap/ssrfmap_wrapper.sh
+        echo 'source ~/Tools/SSRFmap/venv/bin/activate' >> ~/Tools/SSRFmap/ssrfmap_wrapper.sh
+        echo 'python ~/Tools/SSRFmap/ssrfmap.py "$@"' >> ~/Tools/SSRFmap/ssrfmap_wrapper.sh
+        echo 'deactivate' >> ~/Tools/SSRFmap/ssrfmap_wrapper.sh
+        chmod +x ~/Tools/SSRFmap/ssrfmap_wrapper.sh
+    fi
+
+    # Install wpscan
+    if ! check_command "wpscan" || ! wpscan --version &>/dev/null 2>&1; then
+        log_message "Installing WPScan..." "info"
+        
+        # Install Ruby and dependencies
+        log_message "Installing Ruby and dependencies..." "info"
+        run_command "sudo pacman -S --noconfirm --noprogressbar --needed ruby ruby-bundler ruby-rdoc gcc make" \
+            "Ruby installation failed, WPScan may not work correctly" \
+            "Ruby and dependencies installed successfully"
+        
+        # Create a directory for wpscan if it doesn't exist
+        if [ ! -d "$HOME/Tools/wpscan" ]; then
+            run_command "mkdir -p $HOME/Tools/wpscan" \
+                "Failed to create WPScan directory" \
+                "Created WPScan directory"
+        fi
+        
+        # Clone the repository
+        if [ ! -d "$HOME/Tools/wpscan/.git" ]; then
+            log_message "Cloning WPScan repository..." "info"
+            run_command "git clone https://github.com/wpscanteam/wpscan.git $HOME/Tools/wpscan" \
+                "Failed to clone WPScan repository" \
+                "Cloned WPScan repository successfully"
+        else
+            log_message "Updating WPScan repository..." "info"
+            run_command "cd $HOME/Tools/wpscan && git pull" \
+                "Failed to update WPScan repository" \
+                "Updated WPScan repository successfully"
+        fi
+        
+        # Store the current directory to return to it later
+        CURRENT_DIR=$(pwd)
+        
+        # Install wpscan using bundler with local gem installation
+        cd "$HOME/Tools/wpscan" || {
+            log_message "Failed to change to WPScan directory" "error"
+            return 1
+        }
+        
+        # Create a local .bundle/config to install gems locally
+        run_command "mkdir -p .bundle" "Failed to create .bundle directory" "Created .bundle directory"
+        run_command "echo 'BUNDLE_PATH: \"vendor/bundle\"' > .bundle/config" "Failed to create bundle config" 
+        run_command "echo 'BUNDLE_DISABLE_SHARED_GEMS: \"true\"' >> .bundle/config" "Failed to update bundle config"
+        
+        # Install bundler locally if needed
+        log_message "Installing bundler..." "info"
+        run_command "gem install --user-install bundler" \
+            "Failed to install bundler locally" \
+            "Installed bundler locally"
+        
+        # Find bundler executable
+        BUNDLER_PATH="$(gem which bundler 2>/dev/null | sed 's|/lib/.*$|/exe/bundle|')"
+        
+        # Use bundler to install gems
+        log_message "Installing WPScan dependencies with bundler..." "info"
+        if [ -f "$BUNDLER_PATH" ]; then
+            run_command "$BUNDLER_PATH install --path vendor/bundle" \
+                "Failed to install WPScan dependencies with bundler" \
+                "Installed WPScan dependencies successfully"
+        else
+            log_message "Could not find bundler executable. Trying alternative methods..." "warning"
+            # Try to use system bundler with local config
+            run_command "bundle install --path vendor/bundle" \
+                "Failed to install WPScan dependencies with system bundler" \
+                "Installed WPScan dependencies with system bundler"
+        fi
+        
+        # Return to the original directory
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+        
+        # Create a wrapper script for wpscan
+        cat > "$HOME/Tools/wpscan/wpscan_wrapper.sh" << 'EOF'
+#!/bin/bash
+
+# Change to the WPScan directory
+cd "$HOME/Tools/wpscan" || { echo "Error: WPScan directory not found"; exit 1; }
+
+# Find bundler executable
+BUNDLER_PATH="$(gem which bundler 2>/dev/null | sed 's|/lib/.*$|/exe/bundle|')"
+
+# If we can't find bundler through gem which, try other locations
+if [ ! -f "$BUNDLER_PATH" ]; then
+    # Try common locations for bundler
+    for path in "$HOME/.local/share/gem/ruby/"/*/bin/bundle \
+               "$HOME/.gem/ruby/"/*/bin/bundle \
+               /usr/local/bin/bundle \
+               /usr/bin/bundle; do
+        if [ -f "$path" ]; then
+            BUNDLER_PATH="$path"
+            break
+        fi
+    done
+    
+    # If still not found, try to install it
+    if [ ! -f "$BUNDLER_PATH" ]; then
+        echo "Bundler not found. Installing bundler..."
+        gem install --user-install bundler
+        
+        # Try to find it again
+        for path in "$HOME/.local/share/gem/ruby/"/*/bin/bundle \
+                   "$HOME/.gem/ruby/"/*/bin/bundle; do
+            if [ -f "$path" ]; then
+                BUNDLER_PATH="$path"
+                break
+            fi
+        done
+        
+        # If still not found, use system bundler as fallback
+        if [ ! -f "$BUNDLER_PATH" ]; then
+            if command -v bundle &>/dev/null; then
+                BUNDLER_PATH="$(command -v bundle)"
+                echo "Using system bundler: $BUNDLER_PATH"
+            else
+                echo "Failed to find or install bundler. Please install it manually."
+                exit 1
+            fi
+        fi
+    fi
+fi
+
+# Ensure we have a local bundle config
+if [ ! -f .bundle/config ]; then
+    mkdir -p .bundle
+    echo 'BUNDLE_PATH: "vendor/bundle"' > .bundle/config
+    echo 'BUNDLE_DISABLE_SHARED_GEMS: "true"' >> .bundle/config
+fi
+
+# Check if gems are installed, if not install them
+if [ ! -d "vendor/bundle" ]; then
+    echo "Installing required gems locally..."
+    "$BUNDLER_PATH" install --path vendor/bundle
+    if [ $? -ne 0 ]; then
+        echo "Failed to install required gems. Please run 'bundle install --path vendor/bundle' manually in the WPScan directory."
+        exit 1
+    fi
+    echo "Gems installed successfully."
+fi
+
+# Run WPScan with all arguments passed to this script
+"$BUNDLER_PATH" exec ./bin/wpscan "$@"
+EOF
+        chmod +x "$HOME/Tools/wpscan/wpscan_wrapper.sh"
+        
+        # Create a symlink
+        sudo ln -sf "$HOME/Tools/wpscan/wpscan_wrapper.sh" /usr/local/bin/wpscan
+        
+        echo -e "\e[32mWPScan has been installed\e[0m"
+    else
+        echo -e "\e[32mWPScan is already installed and working properly\e[0m"
+    fi
+
+    # Install AwsCLI
+    if ! command -v aws &>/dev/null; then
+        echo -e "\e[31mAwsCLI is not installed in your system.\e[0m"
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+        rm -rf awscliv2.zip
+    else
+        echo -e "\e[32mAwsCLI is already installed.\e[0m"
+    fi
+
+    # Install trufflehog
+    if ! command -v trufflehog &>/dev/null; then
+        echo -e "\e[31mtruffelhog not installed. now installing\e[0m"
+        curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin
+    else
+        echo -e "\e[32mtrufflehog is already installed\e[0m"
+    fi
+
+    # Calling go tool for installation
+    "$HOME/test/tools-installer/installers/go_tool_installer.sh"
+    
+    # Install python-setuptools if not already installed
+    if ! pacman -Q python-setuptools &>/dev/null; then
+        echo -e "\e[31mInstalling python-setuptools...\e[0m"
+        sudo pacman -S --noconfirm --noprogressbar --needed python-setuptools
+    fi
+    
+    # Fix any existing installations
+    fix_existing_installations
+    
+    # Create symlinks for tools that aren't in PATH
+    create_tool_symlinks
+}
+
+# Function to fix existing installations that might be broken
+fix_existing_installations() {
+    echo -e "\e[32mChecking and fixing existing tool installations...\e[0m"
+    
+    # Fix ghauri if it exists but doesn't work
+    if [ -d "$HOME/Tools/ghauri" ] && ! ghauri --help &>/dev/null; then
+        echo -e "\e[31mFixing ghauri installation...\e[0m"
+        
+        # Ensure virtual environment exists
+        if [ ! -d "$HOME/Tools/ghauri/venv" ]; then
+            python3 -m venv ~/Tools/ghauri/venv
+        fi
+        
+        # Install in virtual environment
+        source ~/Tools/ghauri/venv/bin/activate
+        pip install setuptools
+        if [ -f "$HOME/Tools/ghauri/requirements.txt" ]; then
+            pip install -r ~/Tools/ghauri/requirements.txt
+        fi
+        if [ -f "$HOME/Tools/ghauri/setup.py" ]; then
+            python ~/Tools/ghauri/setup.py install
+        fi
+        deactivate
+        
+        # Create wrapper script
+        echo '#!/bin/bash' > ~/Tools/ghauri/ghauri_wrapper.sh
+        echo 'source ~/Tools/ghauri/venv/bin/activate' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        echo '~/Tools/ghauri/venv/bin/python -m ghauri "$@"' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        echo 'deactivate' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        chmod +x ~/Tools/ghauri/ghauri_wrapper.sh
+        
+        # Update symlink
+        sudo ln -sf ~/Tools/ghauri/ghauri_wrapper.sh /usr/local/bin/ghauri
+    fi
+    
+    # Fix paramspider if it exists but doesn't work
+    if [ -d "$HOME/Tools/ParamSpider" ] && ! paramspider -h &>/dev/null; then
+        echo -e "\e[31mFixing paramspider installation...\e[0m"
+        
+        # Ensure virtual environment exists
+        if [ ! -d "$HOME/Tools/ParamSpider/venv" ]; then
+            python3 -m venv ~/Tools/ParamSpider/venv
+        fi
+        
+        # Install in virtual environment
+        source ~/Tools/ParamSpider/venv/bin/activate
+        pip install setuptools
+        if [ -f "$HOME/Tools/ParamSpider/setup.py" ]; then
+            python ~/Tools/ParamSpider/setup.py install
+        fi
+        deactivate
+        
+        # Create wrapper script
+        echo '#!/bin/bash' > ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo 'source ~/Tools/ParamSpider/venv/bin/activate' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo '~/Tools/ParamSpider/venv/bin/python ~/Tools/ParamSpider/paramspider.py "$@"' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        echo 'deactivate' >> ~/Tools/ParamSpider/paramspider_wrapper.sh
+        chmod +x ~/Tools/ParamSpider/paramspider_wrapper.sh
+        
+        # Update symlink
+        sudo ln -sf ~/Tools/ParamSpider/paramspider_wrapper.sh /usr/local/bin/paramspider
+    fi
+    
+    # Fix waymore if it exists but doesn't work
+    if [ -d "$HOME/Tools/waymore" ] && ! waymore -h &>/dev/null; then
+        echo -e "\e[31mFixing waymore installation...\e[0m"
+        
+        # Ensure virtual environment exists
+        if [ ! -d "$HOME/Tools/waymore/venv" ]; then
+            python3 -m venv ~/Tools/waymore/venv
+        fi
+        
+        # Install in virtual environment
+        source ~/Tools/waymore/venv/bin/activate
+        pip install setuptools
+        if [ -f "$HOME/Tools/waymore/requirements.txt" ]; then
+            pip install -r ~/Tools/waymore/requirements.txt
+        fi
+        if [ -f "$HOME/Tools/waymore/setup.py" ]; then
+            python ~/Tools/waymore/setup.py install
+        fi
+        deactivate
+        
+        # Create wrapper script
+        echo '#!/bin/bash' > ~/Tools/waymore/waymore_wrapper.sh
+        echo 'source ~/Tools/waymore/venv/bin/activate' >> ~/Tools/waymore/waymore_wrapper.sh
+        echo '~/Tools/waymore/venv/bin/python -m waymore "$@"' >> ~/Tools/waymore/waymore_wrapper.sh
+        echo 'deactivate' >> ~/Tools/waymore/waymore_wrapper.sh
+        chmod +x ~/Tools/waymore/waymore_wrapper.sh
+        
+        # Update symlink
+        sudo ln -sf ~/Tools/waymore/waymore_wrapper.sh /usr/local/bin/waymore
+    fi
+}
+
+# Function to create symlinks for tools that aren't automatically added to PATH
+create_tool_symlinks() {
+    log_message "Creating tool symlinks..." "info"
+    
+    # Make sure directory exists
+    if [ ! -d "/usr/local/bin" ]; then
+        run_command "sudo mkdir -p /usr/local/bin" \
+            "Failed to create /usr/local/bin directory" \
+            "Created /usr/local/bin directory"
+    fi
+    
+    # Create symlinks for tools that aren't in PATH
+    symlink_if_needed() {
+        local source_script="$1"
+        local target_name="$2"
+        
+        if [ -f "$source_script" ]; then
+            if [ ! -f "/usr/local/bin/$target_name" ] || [ "$(readlink -f "/usr/local/bin/$target_name")" != "$(readlink -f "$source_script")" ]; then
+                log_message "Creating symlink for $target_name" "info"
+                run_command "sudo ln -sf \"$source_script\" \"/usr/local/bin/$target_name\"" \
+                    "Failed to create symlink for $target_name" \
+                    "Created symlink for $target_name"
+                
+                # Make sure the target has execution permissions
+                run_command "sudo chmod +x \"/usr/local/bin/$target_name\"" \
+                    "Failed to set executable permissions on $target_name" \
+                    "Set executable permissions on $target_name"
+            else
+                log_message "Symlink for $target_name already exists" "success"
+            fi
+        else
+            log_message "Source script $source_script not found, cannot create symlink for $target_name" "warning"
+        fi
+    }
+    
+    # Create symlinks for wrapper scripts
+    symlink_if_needed "$HOME/Tools/wpscan/wpscan_wrapper.sh" "wpscan"
+    symlink_if_needed "$HOME/Tools/paramspider/paramspider_wrapper.sh" "paramspider"
+    symlink_if_needed "$HOME/Tools/XSStrike/xsstrike_wrapper.sh" "xsstrike"
+    symlink_if_needed "$HOME/Tools/ghauri/ghauri_wrapper.sh" "ghauri"
+    symlink_if_needed "$HOME/Tools/waymore/waymore_wrapper.sh" "waymore"
+    symlink_if_needed "$HOME/Tools/creepyCrawler/creepyCrawler_wrapper.sh" "creepyCrawler"
+    symlink_if_needed "$HOME/Tools/SSRFmap/ssrfmap_wrapper.sh" "ssrfmap"
+
+    log_message "Tool symlinks created" "success"
+    
+    # Verify symlinks by checking a few tools
+    for tool in wpscan paramspider xsstrike; do
+        if check_command "$tool"; then
+            log_message "$tool is accessible in PATH" "success"
+        else
+            log_message "$tool is not accessible in PATH, you may need to reload your shell" "warning"
+        fi
+    done
+}
+# Main execution
+set -e
+
+# Check if running as root directly (which is not recommended)
+if [ "$(id -u)" = "0" ]; then
+    log_message "This script is not meant to be run directly as root" "warning"
+    log_message "Please run as a normal user with sudo privileges" "warning"
+    exit 1
+fi
+
+# Main function execution
+display_section "EXECUTING INSTALLATION"
+
+# Call the installation function
+arch_tools_installer
+status=$?
+
+# Final results display with fancy animations
+if [ $status -eq 0 ]; then
+    echo -e "\n${CYAN}$(printf '%.0s═' {1..50})${RESET}"
+    echo -e "${GREEN}${BOLD}✅ ARCH TOOLS INSTALLATION COMPLETE!${RESET}"
+    echo -e "${GREEN}${BOLD}🎉 All tools installed successfully!${RESET}"
+    echo -e "${CYAN}$(printf '%.0s═' {1..50})${RESET}\n"
+    
+    log_message "You may need to restart your terminal or run 'source ~/.bashrc' for all tools to be available" "info"
+    log_message "If you encounter any issues, check the log file: $LOG_FILE" "info"
+    
+    # Show a nice completion animation
+    echo -e "${BLUE}${BOLD}Tools are ready to use:${RESET}"
+    for tool in wpscan paramspider xsstrike feroxbuster; do
+        echo -ne "${GREEN}${BOLD}[⚡] Verifying $tool...${RESET}\r"
+        sleep 0.3
+        echo -e "${GREEN}${BOLD}[✓] $tool is ready!${RESET}"
+        sleep 0.2
+    done
+else
+    echo -e "\n${RED}$(printf '%.0s═' {1..50})${RESET}"
+    echo -e "${RED}${BOLD}⚠️ INSTALLATION COMPLETED WITH ERRORS${RESET}"
+    echo -e "${YELLOW}${BOLD}Some tools may not work correctly.${RESET}"
+    echo -e "${RED}$(printf '%.0s═' {1..50})${RESET}\n"
+    
+    log_message "Please check the log file for details: $LOG_FILE" "warning"
+    
+    # Show error notification
+    echo -e "${YELLOW}${BOLD}Troubleshooting tips:${RESET}"
+    echo -e "${CYAN}1. Check permissions in your home directory${RESET}"
+    echo -e "${CYAN}2. Ensure all required dependencies are installed${RESET}"
+    echo -e "${CYAN}3. Try running the installer again${RESET}"
+fi
+
+# Final countdown animation
+echo -e "\n${CYAN}$(printf '%.0s─' {1..50})${RESET}"
+for i in {5..1}; do
+    echo -ne "${BLUE}${BOLD}Finishing in $i seconds...${RESET}\r"
+    sleep 1
+done
+echo -e "\n${CYAN}$(printf '%.0s─' {1..50})${RESET}"
+echo -e "${CYAN}${BOLD}Thank you for using J0K34SEC Arch Tools Installer!${RESET}\n"
+
+exit $status

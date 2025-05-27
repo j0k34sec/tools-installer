@@ -1,0 +1,45 @@
+# Default configuration file for gau
+# This will be copied to the user's home directory during installation
+
+# Providers to use (wayback, commoncrawl, otx, urlscan)
+providers = ["wayback", "commoncrawl", "otx", "urlscan"]
+
+# Maximum number of URLs to fetch
+maxurls = 0
+
+# Include subdomains
+includeSubs = false
+
+# Number of threads to use
+threads = 10
+
+# Blacklist extensions
+blacklist = [
+  "jpg",
+  "jpeg",
+  "gif",
+  "css",
+  "tif",
+  "tiff",
+  "png",
+  "ttf",
+  "woff",
+  "woff2",
+  "ico",
+  "svg"
+]
+
+# JSON output format
+json = false
+
+# Proxy URL
+proxy = ""
+
+# Retries for HTTP client
+retries = 5
+
+# HTTP timeout in seconds
+timeout = 15
+
+# Randomize user agent
+useragent = true

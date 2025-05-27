@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define log file and colors
-LOG_FILE="$HOME/Tools/kali_install_errors.log"
+LOG_FILE="$HOME/Tools/linux_install_errors.log"
 RED="\e[31m"
 GREEN="\e[32m"
 YELLOW="\e[33m"
@@ -13,19 +13,20 @@ BOLD="\e[1m"
 RESET="\e[0m"
 
 # Function to print a fancy banner
-print_kali_banner() {
+print_linux_banner() {
     clear
     echo -e "${BOLD}${CYAN}"
     echo ' ╔═══════════════════════════════════════════════════════╗'
     echo ' ║                                                       ║'
-    echo ' ║         ██╗ ██████╗ ██╗  ██╗██████╗ ██╗  ██╗          ║'
-    echo ' ║         ██║██╔═████╗██║ ██╔╝╚════██╗██║  ██║          ║'
-    echo ' ║         ██║██║██╔██║█████╔╝  █████╔╝███████║          ║'
-    echo ' ║    ██   ██║████╔╝██║██╔═██╗  ╚═══██╗╚════██║          ║'
-    echo ' ║    ╚█████╔╝╚██████╔╝██║  ██╗██████╔╝     ██║          ║'
-    echo ' ║    ╚════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝      ╚═╝           ║'
+    echo ' ║              . --.                                    ║'
+    echo ' ║             | o_o |                                   ║'
+    echo ' ║              |:_/ |                                   ║'
+    echo ' ║             //   \ \                                  ║'
+    echo ' ║            (|     | )                                 ║'
+    echo ' ║           /\\_   _/\\                                 ║'
+    echo ' ║           \___)=(___/                                 ║'
     echo ' ║                                                       ║'
-    echo ' ║           Security Tools Installer v2.0               ║'
+    echo ' ║          Debian Tools Installer v2.0                 ║'
     echo ' ║                                                       ║'
     echo ' ╚═══════════════════════════════════════════════════════╝'
     echo -e "${RESET}\n"
@@ -148,19 +149,63 @@ run_command() {
     fi
 }
 
-kali_tools_installer() {
-    print_kali_banner
-    display_section "INSTALLING KALI LINUX TOOLS"
-
-
-    #checking feroxbuster
+debian_tools_installer() {
+    print_linux_banner
+    display_section "INSTALLING LINUX TOOLS"
+    #feroxbuster
     if ! command -v feroxbuster &>/dev/null; then
         echo -e "\e[31mferoxbuster is not installed. Installing feroxbuster...\e[0m"
-        sudo apt install feroxbuster -y
+        wget https://github.com/epi052/feroxbuster/releases/download/v2.10.4/x86_64-linux-feroxbuster.tar.gz
+        tar -xf x86_64-linux-feroxbuster.tar.gz
+        chmod +x feroxbuster
+        sudo mv feroxbuster /bin
+        rm -rf feroxbuster x86_64-linux-feroxbuster.tar.gz
     else
         echo -e "\e[32mferoxbuster is already installed...\e[0m"
     fi
 
+    #XSSstrike
+    xsstrike_DIR="$HOME/Tools/XSStrike"
+    if [ -d "$xsstrike_DIR" ]; then
+        echo -e "\e[32mXsstrike is already installed path is ~/Tools/XSStrike.\e[0m"
+    else
+        echo -e "\e[31mXSStrike not installed. Now installing XSStrike....\e[0m"
+        git clone https://github.com/s0md3v/XSStrike.git ~/Tools/XSStrike
+        pip3 install -r ~/Tools/XSStrike/requirements.txt
+        chmod +x ~/Tools/XSStrike/xsstrike.py
+        echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
+    fi
+
+    #sqlmap
+    sqlmap_DIR="$HOME/Tools/sqlmap"
+    if [ -d "$sqlmap_DIR" ]; then
+        echo -e "\e[32msqlmap is already installed path is ~/Tools/sqlmap\e[0m"
+    else
+        echo -e "\e[31mnow installing sqlmap....\e[0m"
+        git clone https://github.com/sqlmapproject/sqlmap.git ~/Tools/sqlmap
+    fi
+
+    #ghauri
+    if ! command -v ghauri &>/dev/null; then
+        echo -e "\e[31mghauri is not installed. Now installing ghauri....\e[0m"
+        git clone https://github.com/r0oth3x49/ghauri.git ~/Tools/ghauri
+        pip3 install -r ~/Tools/ghauri/requirements.txt
+        python3 ~/Tools/ghauri/setup.py build
+        sudo python3 ~/Tools/ghauri/setup.py install
+    else
+        echo -e "\e[32mghauri is already installed\e[0m"
+    fi
+
+    #checking if waymore installed or not
+    if ! command -v waymore -h &>/dev/null; then
+        echo -e "\e[31mwaymore is not installed. Now installing waymore...\e[0m"
+        git clone https://github.com/xnl-h4ck3r/waymore.git ~/Tools/waymore
+        pip3 install -r ~/Tools/waymore/requirements.txt
+        python3 ~/Tools/waymore/setup.py build
+        sudo python3 ~/Tools/waymore/setup.py install
+    else
+        echo -e "\e[32mwaymore is already installed\e[0m"
+    fi
 
     # Check if paramspider is installed or not
     if ! command -v paramspider &>/dev/null; then
@@ -217,113 +262,6 @@ EOF
         fi
     fi
 
-
-    #XSSstrike
-    xsstrike_DIR="$HOME/Tools/XSStrike"
-    if [ -d "$xsstrike_DIR" ]; then
-        echo -e "\e[32mXsstrike is already installed path is ~/Tools/XSStrike.\e[0m"
-    else
-        echo -e "\e[31mXSStrike not installed. Now installing XSStrike....\e[0m"
-        git clone https://github.com/s0md3v/XSStrike.git ~/Tools/XSStrike
-        pip3 install -r ~/Tools/XSStrike/requirements.txt
-        chmod +x ~/Tools/XSStrike/xsstrike.py
-        echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
-    fi
-
-
-    #checking if sqlmap installed or not
-    if ! command -v sqlmap &>/dev/null; then
-        log_message "sqlmap is not installed. Now installing sqlmap..." "step"
-        run_command "sudo apt install sqlmap -y" \
-            "Failed to install sqlmap" \
-            "sqlmap installed successfully"
-    else
-        log_message "sqlmap is already installed" "success"
-    fi
-    
-    # Install SecLists wordlists collection
-    display_section "INSTALLING SECLISTS WORDLISTS"
-    if [ ! -d "/usr/share/wordlists/SecLists" ]; then
-        log_message "SecLists not found. Installing SecLists wordlists collection..." "step"
-        
-        # Make sure the wordlists directory exists
-        if [ ! -d "/usr/share/wordlists" ]; then
-            run_command "sudo mkdir -p /usr/share/wordlists" \
-                "Failed to create wordlists directory" \
-                "Created wordlists directory"
-        fi
-        
-        # Clone SecLists repository
-        {
-            # Clone with depth=1 to save space and time
-            sudo git clone --depth 1 https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists
-            clone_status=$?
-        } & spinner $! "Downloading SecLists wordlists collection"
-        
-        if [ $clone_status -eq 0 ]; then
-            log_message "SecLists installed successfully in /usr/share/wordlists/SecLists" "success"
-            
-            # Set proper permissions
-            run_command "sudo chmod -R 755 /usr/share/wordlists/SecLists" \
-                "Failed to set permissions on SecLists" \
-                "Set proper permissions on SecLists"
-                
-            # Create a symlink to common wordlists for easy access
-            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Discovery/Web-Content/common.txt /usr/share/wordlists/common.txt" \
-                "Failed to create symlink to common wordlist" \
-                "Created symlink to common wordlist"
-                
-            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt /usr/share/wordlists/rockyou.txt" \
-                "Failed to create symlink to rockyou wordlist" \
-                "Created symlink to rockyou wordlist"
-        else
-            log_message "Failed to install SecLists. You can install it manually with:" "error"
-            log_message "sudo git clone https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists" "info"
-        fi
-    else
-        log_message "SecLists is already installed in /usr/share/wordlists/SecLists" "success"
-        
-        # Update existing SecLists if it's a git repository
-        if [ -d "/usr/share/wordlists/SecLists/.git" ]; then
-            log_message "Updating existing SecLists installation..." "info"
-            {
-                sudo git -C /usr/share/wordlists/SecLists pull
-                update_status=$?
-            } & spinner $! "Updating SecLists to latest version"
-            
-            if [ $update_status -eq 0 ]; then
-                log_message "SecLists updated successfully" "success"
-            else
-                log_message "Failed to update SecLists" "warning"
-            fi
-        fi
-    fi
-
-
-    #ghauri
-    if ! command -v ghauri &>/dev/null; then
-        echo -e "\e[31mghauri is not installed. Now installing ghauri....\e[0m"
-        git clone https://github.com/r0oth3x49/ghauri.git ~/Tools/ghauri
-        pip3 install -r ~/Tools/ghauri/requirements.txt
-        python3 ~/Tools/ghauri/setup.py build
-        sudo python3 ~/Tools/ghauri/setup.py install
-    else
-        echo -e "\e[32mghauri is already installed\e[0m"
-    fi
-
-
-    #checking if waymore installed or not
-    if ! command -v waymore -h &>/dev/null; then
-        echo -e "\e[31mwaymore is not installed. Now installing waymore...\e[0m"
-        git clone https://github.com/xnl-h4ck3r/waymore.git ~/Tools/waymore
-        pip3 install -r ~/Tools/waymore/requirements.txt
-        python3 ~/Tools/waymore/setup.py build
-        sudo python3 ~/Tools/waymore/setup.py install
-    else
-        echo -e "\e[32mwaymore is already installed\e[0m"
-    fi
-
-
     #checking if creepy crawler installed or not
     creepyCrawler_DIR=$HOME/Tools/creepyCrawler
     if [ -d "$creepyCrawler_DIR" ]; then
@@ -335,7 +273,6 @@ EOF
         chmod +x ~/Tools/creepyCrawler/creepyCrawler.py
     fi
 
-
     #checkig if ffuf installed or not
     if ! command -v ffuf &>/dev/null; then
         echo -e "\e[31mffuf not installed. Now installing ffuf\e[0m"
@@ -344,18 +281,39 @@ EOF
         echo -e "\e[32mffuf already installed...\e[0m"
     fi
 
-
     #checking if SSRFmap installed or not
     ssrf_DIR=$HOME/Tools/SSRFmap
     if [ -d "$ssrf_DIR" ]; then
         echo -e "\e[32mSSRFmap already installed...\e[0m"
     else
-        echo -e "\e[31meSSRFmap Now installing....\e[0m]"
+        echo -e "\e[31mSSRFmap Now installing....\e[0m"
         git clone https://github.com/swisskyrepo/SSRFmap.git ~/Tools/SSRFmap/
         pip install -r ~/Tools/SSRFmap/requirements.txt
         chmod +x ~/Tools/SSRFmap/ssrfmap.py
     fi
 
+    #seclists
+    seclist_DIR=/usr/share/seclists
+    if [ -d "$seclist_DIR" ]; then
+        echo -e "\e[32mseclist is already installed path is /usr/share/seclists\e[0m"
+    else
+        echo -e "\e[31mNow Installing seclists....\e[0m"
+        git clone https://github.com/danielmiessler/SecLists.git ~/Tools/SecLists
+        mv ~/Tools/SecLists ~/Tools/seclists
+        sudo cp -r ~/Tools/seclists /usr/share
+        rm -rf ~/Tools/seclists
+    fi
+
+    #metasploit
+    if ! command -v msfvenom &>/dev/null; then
+        echo -e "\e[31mNow installing Metasploit...\e[0m"
+        mkdir -p ~/Tools # Ensure ~/Tools directory exists
+        curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb -o ~/Tools/msfinstall
+        chmod 755 ~/Tools/msfinstall # Make the installer executable
+        ~/Tools/msfinstall           # Run the installer
+    else
+        echo -e "\e[32mMetasploit is already installed.\e[0m"
+    fi
 
     #checking wpscan
     if ! command -v wpscan &>/dev/null; then
@@ -366,17 +324,15 @@ EOF
         echo -e "\e[32mWpscan is already installed\e[0m"
     fi
 
-    #checking if AwsCLI installed
-    if ! command -v aws &>/dev/null; then
-        echo -e "\e[31mAwsCLI is not installed in your system.\e[0m"
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip awscliv2.zip
-        sudo ./aws/install
-        rm -rf awscliv2.zip
+    #checking trufflehog
+    if ! command -v trufflehog &>/dev/null; then
+        echo -e "\e[31mtruffelhog not installed. now installing\e[0m"
+        curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin
     else
-        echo -e "\e[32mAwsCLI is already installed.\e[0m"
+        echo -e "\e[32mtrufflehog is already installed\e[0m"
     fi
-    #calling go tool for installation
+
+    # calling go tool for installation
     "$HOME/test/tools-installer/installers/go_tool_installer.sh"
     
     # Create symlinks for tools that aren't in PATH
@@ -418,5 +374,4 @@ create_tool_symlinks() {
     echo -e "\e[32mAll symlinks created successfully!\e[0m"
 }
 
-#calling the function
-kali_tools_installer
+debian_tools_installer

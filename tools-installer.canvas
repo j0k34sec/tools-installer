@@ -1,0 +1,34 @@
+{
+	"nodes":[
+		{"id":"a6c85c9a7e3c0c7a","type":"text","text":"# J0K34SEC Security Tools Installer\n\nA comprehensive security tools installer for different Linux distributions with visual enhancements and error handling.","x":-500,"y":-680,"width":400,"height":160,"color":"5"},
+		{"id":"7e0b3a9d8c3a0a8a","type":"text","text":"## main.sh\n\nMain entry point that:\n- Displays J0K34 ASCII banner\n- Checks for updates\n- Detects OS type\n- Installs basic requirements\n- Calls appropriate installer based on OS","x":-500,"y":-440,"width":400,"height":200,"color":"4"},
+		{"id":"b7c95c9a7e3c0c7b","type":"text","text":"## installers/arch_installer\n\nInstalls security tools for Arch Linux and Arch-based distros:\n- Displays Arch-themed banner\n- Checks for yay AUR helper\n- Installs tools via pacman/yay\n- Creates symlinks for tools\n- Installs SecLists wordlists","x":-920,"y":-160,"width":400,"height":240,"color":"1"},
+		{"id":"c8d06d0a8e4c1d8c","type":"text","text":"## installers/kali_installer\n\nInstalls security tools for Kali Linux:\n- Displays J0K34 ASCII banner\n- Installs tools via apt\n- Creates symlinks\n- Installs SecLists wordlists","x":-500,"y":-160,"width":400,"height":200,"color":"1"},
+		{"id":"d9e17e1b9f5d2e9d","type":"text","text":"## installers/other_linux_installer\n\nInstalls security tools for other Linux distros:\n- Displays Tux ASCII banner\n- Installs tools via apt/manual installation\n- Creates symlinks\n- Installs SecLists wordlists","x":-80,"y":-160,"width":400,"height":200,"color":"1"},
+		{"id":"e0f28f2c0g6e3f0e","type":"text","text":"## installers/go_tool_installer.sh\n\nInstalls Go-based security tools:\n- Displays Go tools banner\n- Checks for Go installation\n- Installs Go tools via go install\n- Updates PATH in shell config\n- Creates symlinks","x":340,"y":-160,"width":400,"height":200,"color":"1"},
+		{"id":"f1g39g3d1h7f4g1f","type":"text","text":"## manage_tools.sh\n\nManages installed security tools:\n- Lists installed tools\n- Uninstalls tools\n- Provides help information\n- Displays J0K34 ASCII banner","x":-500,"y":120,"width":400,"height":160,"color":"3"},
+		{"id":"g2h40h4e2i8g5h2g","type":"text","text":"## Visual Enhancements\n\n- J0K34 ASCII art banner (main.sh, kali_installer)\n- Tux ASCII art (other_linux_installer)\n- Arch-themed banner (arch_installer)\n- Spinner animations\n- Progress bars\n- Colored output","x":-920,"y":120,"width":400,"height":200,"color":"6"},
+		{"id":"h3i51i5f3j9h6i3h","type":"text","text":"## Error Handling\n\n- Centralized logging system\n- Visual error indicators\n- Detailed error messages\n- Error recovery mechanisms\n- Log files for each installer","x":-80,"y":120,"width":400,"height":160,"color":"2"},
+		{"id":"i4j62j6g4k0i7j4i","type":"text","text":"## Tool Categories\n\n- Web Application Security\n- Network Security\n- Wordlists (SecLists)\n- Reconnaissance\n- Exploitation\n- Vulnerability Scanning","x":340,"y":120,"width":400,"height":160,"color":"6"}
+	],
+	"edges":[
+		{"id":"j5k73k7h5l1j8k5j","fromNode":"a6c85c9a7e3c0c7a","fromSide":"bottom","toNode":"7e0b3a9d8c3a0a8a","toSide":"top"},
+		{"id":"k6l84l8i6m2k9l6k","fromNode":"7e0b3a9d8c3a0a8a","fromSide":"bottom","toNode":"b7c95c9a7e3c0c7b","toSide":"top","label":"Arch Linux"},
+		{"id":"l7m95m9j7n3l0m7l","fromNode":"7e0b3a9d8c3a0a8a","fromSide":"bottom","toNode":"c8d06d0a8e4c1d8c","toSide":"top","label":"Kali Linux"},
+		{"id":"m8n06n0k8o4m1n8m","fromNode":"7e0b3a9d8c3a0a8a","fromSide":"bottom","toNode":"d9e17e1b9f5d2e9d","toSide":"top","label":"Other Linux"},
+		{"id":"n9o17o1l9p5n2o9n","fromNode":"7e0b3a9d8c3a0a8a","fromSide":"bottom","toNode":"e0f28f2c0g6e3f0e","toSide":"top","label":"Go Tools"},
+		{"id":"o0p28p2m0q6o3p0o","fromNode":"7e0b3a9d8c3a0a8a","fromSide":"bottom","toNode":"f1g39g3d1h7f4g1f","toSide":"top","label":"Tool Management"},
+		{"id":"p1q39q3n1r7p4q1p","fromNode":"b7c95c9a7e3c0c7b","fromSide":"bottom","toNode":"g2h40h4e2i8g5h2g","toSide":"top"},
+		{"id":"q2r40r4o2s8q5r2q","fromNode":"c8d06d0a8e4c1d8c","fromSide":"bottom","toNode":"g2h40h4e2i8g5h2g","toSide":"top"},
+		{"id":"r3s51s5p3t9r6s3r","fromNode":"d9e17e1b9f5d2e9d","fromSide":"bottom","toNode":"g2h40h4e2i8g5h2g","toSide":"top"},
+		{"id":"s4t62t6q4u0s7t4s","fromNode":"e0f28f2c0g6e3f0e","fromSide":"bottom","toNode":"g2h40h4e2i8g5h2g","toSide":"top"},
+		{"id":"t5u73u7r5v1t8u5t","fromNode":"b7c95c9a7e3c0c7b","fromSide":"bottom","toNode":"h3i51i5f3j9h6i3h","toSide":"top"},
+		{"id":"u6v84v8s6w2u9v6u","fromNode":"c8d06d0a8e4c1d8c","fromSide":"bottom","toNode":"h3i51i5f3j9h6i3h","toSide":"top"},
+		{"id":"v7w95w9t7x3v0w7v","fromNode":"d9e17e1b9f5d2e9d","fromSide":"bottom","toNode":"h3i51i5f3j9h6i3h","toSide":"top"},
+		{"id":"w8x06x0u8y4w1x8w","fromNode":"e0f28f2c0g6e3f0e","fromSide":"bottom","toNode":"h3i51i5f3j9h6i3h","toSide":"top"},
+		{"id":"x9y17y1v9z5x2y9x","fromNode":"b7c95c9a7e3c0c7b","fromSide":"bottom","toNode":"i4j62j6g4k0i7j4i","toSide":"top"},
+		{"id":"y0z28z2w0a6y3z0y","fromNode":"c8d06d0a8e4c1d8c","fromSide":"bottom","toNode":"i4j62j6g4k0i7j4i","toSide":"top"},
+		{"id":"z1a39a3x1b7z4a1z","fromNode":"d9e17e1b9f5d2e9d","fromSide":"bottom","toNode":"i4j62j6g4k0i7j4i","toSide":"top"},
+		{"id":"a2b40b4y2c8a5b2a","fromNode":"e0f28f2c0g6e3f0e","fromSide":"bottom","toNode":"i4j62j6g4k0i7j4i","toSide":"top"}
+	]
+}

@@ -439,43 +439,17 @@ check_os_type() {
         elif [ "$ID" = "arch" ] || [ "$ID" = "manjaro" ] || [ "$ID" = "endeavouros" ]; then
             echo -e "${GREEN}The system is running Arch Linux or an Arch-based distribution: $PRETTY_NAME${RESET}"
             
-            # Check for yay AUR helper
-            if ! command -v yay &>/dev/null; then
-                echo -e "${YELLOW}The yay AUR helper is not installed on your system.${RESET}"
-                read -p "Would you like to install yay? (y/n): " install_yay
-                
-                if [[ "$install_yay" =~ ^[Yy]$ ]]; then
-                    echo -e "${BLUE}Installing yay AUR helper...${RESET}"
-                    
-                    # Create temp directory
-                    temp_dir=$(mktemp -d)
-                    cd "$temp_dir"
-                    
-                    # Install git if not already installed
-                    if ! command -v git &>/dev/null; then
-                        echo -e "${BLUE}Installing git...${RESET}"
-                        sudo pacman -S --noconfirm --needed git
-                    fi
-                    
-                    # Clone yay repo and build
-                    git clone https://aur.archlinux.org/yay.git
-                    cd yay
-                    makepkg -si --noconfirm
-                    
-                    # Clean up
-                    cd "$TARGET"
-                    rm -rf "$temp_dir"
-                    
-                    if command -v yay &>/dev/null; then
-                        echo -e "${GREEN}yay has been successfully installed!${RESET}"
-                    else
-                        echo -e "${RED}Failed to install yay. Continuing with installation...${RESET}"
-                    fi
-                else
-                    echo -e "${YELLOW}Skipping yay installation. Some tools might not be available.${RESET}"
-                fi
-            else
-                echo -e "${GREEN}yay AUR helper is already installed.${RESET}"
+            # Tools installation approach
+            echo -e "${GREEN}All AUR packages will be installed manually from source or GitHub releases.${RESET}"
+            echo -e "${BLUE}No package helper like yay will be used for installations.${RESET}"
+            
+            # Make sure git and base-devel are installed for building packages from source
+            if ! pacman -Q git &>/dev/null; then
+                sudo pacman -S --noconfirm git
+            fi
+            
+            if ! pacman -Q base-devel &>/dev/null; then
+                sudo pacman -S --noconfirm base-devel
             fi
             
             # Check if installer script exists

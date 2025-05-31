@@ -1,0 +1,25 @@
+Metadata-Version: 2.4
+Name: waymore
+Version: 6.1
+Summary: Find way more from the Wayback Machine, Common Crawl, Alien Vault OTX, URLScan & VirusTotal!
+Home-page: https://github.com/xnl-h4ck3r/waymore
+Author: @xnl-h4ck3r
+Description-Content-Type: text/markdown
+Requires-Dist: requests
+Requires-Dist: pyyaml
+Requires-Dist: termcolor
+Requires-Dist: psutil
+Requires-Dist: urlparse3
+Requires-Dist: tldextract
+Dynamic: author
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary
+
+# All Bug Hunting tools-installer
+<img src="https://github.com/jokerexe01/tools-installer/blob/main/logo.png" alt="Profile Image" width="500"/>
+"I created this tool to simplify the installation of all essential bug hunting tools. If anyone wants to add other tools, feel free to fork and contribute."
+
+This encourages collaboration and contributions from others. Let me know if you'd like any further adjustments!

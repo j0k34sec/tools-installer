@@ -1,0 +1,8 @@
+README.md
+ghauri.egg-info/PKG-INFO
+ghauri.egg-info/SOURCES.txt
+ghauri.egg-info/dependency_links.txt
+ghauri.egg-info/entry_points.txt
+ghauri.egg-info/not-zip-safe
+ghauri.egg-info/requires.txt
+ghauri.egg-info/top_level.txt

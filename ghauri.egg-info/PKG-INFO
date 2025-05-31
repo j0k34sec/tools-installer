@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: ghauri
+Version: 1.4.2
+Summary: An advanced SQL injection detection & exploitation tool.
+Author: Nasir Khan
+Author-email: r0oth3x49@gmail.com
+Keywords: mysql,mssql,oracle,postgre,sql,injection,boolean-based,time-based,error-based,stacked-queries
+Classifier: Programming Language :: Python3
+Requires-Python: >=3.6
+Requires-Dist: tldextract
+Requires-Dist: colorama
+Requires-Dist: requests
+Requires-Dist: chardet
+Requires-Dist: ua_generator
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: keywords
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

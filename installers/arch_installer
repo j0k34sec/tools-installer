@@ -197,7 +197,10 @@ arch_tools_installer() {
         update_status=$?
     } & spinner $! "Updating package database"
     
-    if [ $update_status -ne 0 ]; then
+    # Make sure update_status is set
+    update_status=${update_status:-0}
+    
+    if [ "$update_status" -ne 0 ]; then
         log_message "Pacman update failed, continuing with installation..." "warning"
     else
         log_message "Package database updated successfully" "success"
@@ -242,13 +245,8 @@ arch_tools_installer() {
     # Install feroxbuster
     if ! check_command "feroxbuster"; then
         log_message "Installing feroxbuster..." "info"
-        # Check if yay is installed (AUR helper)
-        if check_command "yay"; then
-            run_command "yay -S --noconfirm feroxbuster" \
-                "Failed to install feroxbuster using yay" \
-                "Feroxbuster installed successfully using yay"
-        else
-            log_message "Yay not found, installing feroxbuster manually from GitHub release" "info"
+        # Install feroxbuster manually from GitHub release
+        log_message "Installing feroxbuster manually from GitHub release" "info"
             # Make sure wget is installed
             if ! check_command "wget"; then
                 run_command "sudo pacman -S --noconfirm wget" "Failed to install wget" "Wget installed"
@@ -256,6 +254,8 @@ arch_tools_installer() {
             
             # Create a temp directory for the download
             TMP_DIR=$(mktemp -d)
+            # Save current directory
+            CURRENT_DIR=$(pwd)
             cd "$TMP_DIR" || {
                 log_message "Failed to create temporary directory for feroxbuster download" "error"
                 return 1
@@ -269,8 +269,9 @@ arch_tools_installer() {
             run_command "tar -xf x86_64-linux-feroxbuster.tar.gz" "Failed to extract feroxbuster" "Extracted feroxbuster"
             run_command "chmod +x feroxbuster" "Failed to set executable permissions on feroxbuster" "Set permissions on feroxbuster"
             run_command "sudo mv feroxbuster /usr/local/bin" "Failed to install feroxbuster to /usr/local/bin" "Moved feroxbuster to /usr/local/bin"
+            # Return to original directory before cleaning up
+            cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
             run_command "rm -rf $TMP_DIR" "Failed to clean up temporary files" "Cleaned up temporary files"
-        fi
         
         # Verify installation
         if check_command "feroxbuster"; then
@@ -286,6 +287,12 @@ arch_tools_installer() {
     # Check if paramspider is already working properly
     if ! (command -v paramspider &>/dev/null && paramspider -h &>/dev/null); then
         echo -e "\e[31mparamspider is not installed. Now installing paramspider...\e[0m"
+        # Make sure Tools directory exists
+        mkdir -p ~/Tools
+        # Save current directory
+        CURRENT_DIR=$(pwd)
+        # Change to home directory to ensure we have a valid working directory
+        cd ~ || log_message "Failed to change to home directory" "error"
         git clone https://github.com/devanshbatham/ParamSpider.git ~/Tools/ParamSpider
         
         # Check if python-setuptools is installed, if not install it
@@ -294,12 +301,31 @@ arch_tools_installer() {
             sudo pacman -S --noconfirm --noprogressbar --needed python-setuptools
         fi
         
+        # Create an empty README.md file if it doesn't exist
+        if [ ! -f ~/Tools/ParamSpider/README.md ]; then
+            echo "# ParamSpider" > ~/Tools/ParamSpider/README.md
+            echo "A tool to find parameters in URLs" >> ~/Tools/ParamSpider/README.md
+        fi
+        
         # Install in a virtual environment
         python3 -m venv ~/Tools/ParamSpider/venv
         source ~/Tools/ParamSpider/venv/bin/activate
         pip install setuptools
-        python ~/Tools/ParamSpider/setup.py install
+        
+        # Change to the ParamSpider directory before running setup.py
+        cd ~/Tools/ParamSpider || {
+            log_message "Failed to change to ParamSpider directory" "error"
+            deactivate
+            cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+            return 1
+        }
+        
+        # Run setup.py in the correct directory
+        python setup.py install
+        
+        # Deactivate the virtual environment and return to original directory
         deactivate
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
         
         # Create wrapper script for paramspider
         echo '#!/bin/bash' > ~/Tools/ParamSpider/paramspider_wrapper.sh
@@ -338,63 +364,185 @@ arch_tools_installer() {
         echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
     fi
 
-    # Install sqlmap
-    if ! command -v sqlmap &>/dev/null; then
-        echo -e "\e[31msqlmap is not installed. Now installing sqlmap...\e[0m"
-        sudo pacman -S --noconfirm --noprogressbar --needed sqlmap || echo "Sqlmap installation failed, continuing..."
+    # Install sqlmap using pacman (package manager)
+    echo -e "\e[34mSetting up sqlmap using pacman...\e[0m"
+    
+    # Check if sqlmap is installed via pacman
+    if ! pacman -Q sqlmap &>/dev/null; then
+        echo -e "\e[31msqlmap is not installed. Installing sqlmap via pacman...\e[0m"
+        if ! sudo pacman -S --noconfirm --noprogressbar --needed sqlmap; then
+            log_message "Failed to install sqlmap via pacman" "error"
+            echo -e "\e[31mSqlmap installation failed. Please install manually with 'sudo pacman -S sqlmap'\e[0m"
+        else
+            log_message "Sqlmap installed successfully via pacman" "success"
+        fi
     else
-        echo -e "\e[32msqlmap is already installed...\e[0m"
+        echo -e "\e[32msqlmap is already installed via pacman...\e[0m"
+        # Verify the installed version
+        SQLMAP_VERSION=$(pacman -Q sqlmap | awk '{print $2}')
+        echo -e "\e[32mInstalled sqlmap version: $SQLMAP_VERSION\e[0m"
     fi
     
     # Install SecLists wordlists collection
     display_section "INSTALLING SECLISTS WORDLISTS"
-    if [ ! -d "/usr/share/wordlists/SecLists" ]; then
+    
+    # Define both system and user locations for SecLists
+    SYSTEM_SECLISTS="/usr/share/wordlists/SecLists"
+    USER_SECLISTS="$HOME/Tools/wordlists/SecLists"
+    
+    # First check if SecLists exists in either location
+    if [ ! -d "$SYSTEM_SECLISTS" ] && [ ! -d "$USER_SECLISTS" ]; then
         log_message "SecLists not found. Installing SecLists wordlists collection..." "step"
         
-        # Make sure the wordlists directory exists
+        # Try to create system wordlists directory if it doesn't exist
         if [ ! -d "/usr/share/wordlists" ]; then
-            run_command "sudo mkdir -p /usr/share/wordlists" \
-                "Failed to create wordlists directory" \
-                "Created wordlists directory"
+            if run_command "sudo mkdir -p /usr/share/wordlists" \
+                "Failed to create system wordlists directory" \
+                "Created system wordlists directory" false; then
+                # System directory created successfully, continue with system install
+                install_location="$SYSTEM_SECLISTS"
+                use_sudo=true
+            else
+                # Fallback to user directory
+                mkdir -p "$HOME/Tools/wordlists"
+                install_location="$USER_SECLISTS"
+                use_sudo=false
+                log_message "Using user directory for SecLists installation" "info"
+            fi
+        else
+            # System directory exists, try to use it
+            if run_command "sudo touch /usr/share/wordlists/test_write_permission && sudo rm /usr/share/wordlists/test_write_permission" \
+                "No write permission to system wordlists directory" \
+                "Have write permission to system wordlists directory" false; then
+                install_location="$SYSTEM_SECLISTS"
+                use_sudo=true
+            else
+                # Fallback to user directory
+                mkdir -p "$HOME/Tools/wordlists"
+                install_location="$USER_SECLISTS"
+                use_sudo=false
+                log_message "Using user directory for SecLists installation" "info"
+            fi
         fi
+        
+        # Store current directory
+        CURRENT_DIR=$(pwd)
         
         # Clone SecLists repository
-        {
-            # Clone with depth=1 to save space and time
-            sudo git clone --depth 1 https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists
-            clone_status=$?
-        } & spinner $! "Downloading SecLists wordlists collection"
+        log_message "Cloning SecLists to $install_location" "info"
+        if [ "$use_sudo" = true ]; then
+            {
+                # Clone with depth=1 to save space and time using sudo
+                sudo git clone --depth 1 https://github.com/danielmiessler/SecLists.git "$install_location"
+                clone_status=$?
+            } & spinner $! "Downloading SecLists wordlists collection (system-wide)"
+        else
+            {
+                # Clone with depth=1 to save space and time without sudo
+                git clone --depth 1 https://github.com/danielmiessler/SecLists.git "$install_location"
+                clone_status=$?
+            } & spinner $! "Downloading SecLists wordlists collection (user directory)"
+        fi
         
         if [ $clone_status -eq 0 ]; then
-            log_message "SecLists installed successfully in /usr/share/wordlists/SecLists" "success"
+            # Return to original directory if we changed directories
+            if [ -n "$CURRENT_DIR" ]; then
+                cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+            fi
+            
+            log_message "SecLists installed successfully in $install_location" "success"
             
             # Set proper permissions
-            run_command "sudo chmod -R 755 /usr/share/wordlists/SecLists" \
-                "Failed to set permissions on SecLists" \
-                "Set proper permissions on SecLists"
+            if [ "$use_sudo" = true ]; then
+                run_command "sudo chmod -R 755 $install_location" \
+                    "Failed to set permissions on SecLists" \
+                    "Set proper permissions on SecLists"
+                    
+                # Create symlinks to common wordlists for easy access (system-wide)
+                mkdir -p "$HOME/Tools/wordlists"
                 
-            # Create a symlink to common wordlists for easy access
-            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Discovery/Web-Content/common.txt /usr/share/wordlists/common.txt" \
-                "Failed to create symlink to common wordlist" \
-                "Created symlink to common wordlist"
+                # Create symlinks in system directory
+                run_command "sudo ln -sf $install_location/Discovery/Web-Content/common.txt /usr/share/wordlists/common.txt" \
+                    "Failed to create system symlink to common wordlist" \
+                    "Created system symlink to common wordlist"
+                    
+                run_command "sudo ln -sf $install_location/Passwords/Leaked-Databases/rockyou.txt /usr/share/wordlists/rockyou.txt" \
+                    "Failed to create system symlink to rockyou wordlist" \
+                    "Created system symlink to rockyou wordlist"
                 
-            run_command "sudo ln -sf /usr/share/wordlists/SecLists/Passwords/Leaked-Databases/rockyou.txt /usr/share/wordlists/rockyou.txt" \
-                "Failed to create symlink to rockyou wordlist" \
-                "Created symlink to rockyou wordlist"
+                # Also create user-accessible symlinks
+                ln -sf "$install_location/Discovery/Web-Content/common.txt" "$HOME/Tools/wordlists/common.txt" 2>/dev/null
+                ln -sf "$install_location/Passwords/Leaked-Databases/rockyou.txt" "$HOME/Tools/wordlists/rockyou.txt" 2>/dev/null
+            else
+                # Set permissions for user installation
+                chmod -R 755 "$install_location" 2>/dev/null
+                
+                # Create symlinks in user directory
+                mkdir -p "$HOME/Tools/wordlists"
+                ln -sf "$install_location/Discovery/Web-Content/common.txt" "$HOME/Tools/wordlists/common.txt" 2>/dev/null
+                ln -sf "$install_location/Passwords/Leaked-Databases/rockyou.txt" "$HOME/Tools/wordlists/rockyou.txt" 2>/dev/null
+                
+                log_message "Created user-accessible symlinks in $HOME/Tools/wordlists" "success"
+            fi
         else
-            log_message "Failed to install SecLists. You can install it manually with:" "error"
-            log_message "sudo git clone https://github.com/danielmiessler/SecLists.git /usr/share/wordlists/SecLists" "info"
+            # Return to original directory if we changed directories
+            if [ -n "$CURRENT_DIR" ]; then
+                cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+            fi
+            
+            log_message "Failed to install SecLists. Trying alternative method..." "warning"
+            
+            # Try without spinner for better error reporting
+            if [ "$use_sudo" = true ]; then
+                if sudo git clone --depth 1 https://github.com/danielmiessler/SecLists.git "$install_location" 2>/dev/null; then
+                    log_message "SecLists installed successfully using alternative method" "success"
+                else
+                    # Fallback to user directory
+                    install_location="$USER_SECLISTS"
+                    mkdir -p "$HOME/Tools/wordlists"
+                    if git clone --depth 1 https://github.com/danielmiessler/SecLists.git "$install_location" 2>/dev/null; then
+                        log_message "SecLists installed successfully in user directory" "success"
+                    else
+                        log_message "All installation methods failed. You can try manually with:" "error"
+                        log_message "git clone https://github.com/danielmiessler/SecLists.git ~/Tools/wordlists/SecLists" "info"
+                    fi
+                fi
+            else
+                if git clone --depth 1 https://github.com/danielmiessler/SecLists.git "$install_location" 2>/dev/null; then
+                    log_message "SecLists installed successfully using alternative method" "success"
+                else
+                    log_message "All installation methods failed. You can try manually with:" "error"
+                    log_message "git clone https://github.com/danielmiessler/SecLists.git ~/Tools/wordlists/SecLists" "info"
+                fi
+            fi
         fi
     else
-        log_message "SecLists is already installed in /usr/share/wordlists/SecLists" "success"
+        # SecLists is already installed, determine where it is
+        if [ -d "$SYSTEM_SECLISTS" ]; then
+            install_location="$SYSTEM_SECLISTS"
+            use_sudo=true
+            log_message "SecLists is already installed in $install_location" "success"
+        else
+            install_location="$USER_SECLISTS"
+            use_sudo=false
+            log_message "SecLists is already installed in $install_location" "success"
+        fi
         
         # Update existing SecLists if it's a git repository
-        if [ -d "/usr/share/wordlists/SecLists/.git" ]; then
+        if [ -d "$install_location/.git" ]; then
             log_message "Updating existing SecLists installation..." "info"
-            {
-                sudo git -C /usr/share/wordlists/SecLists pull
-                update_status=$?
-            } & spinner $! "Updating SecLists to latest version"
+            
+            if [ "$use_sudo" = true ]; then
+                {
+                    sudo git -C "$install_location" pull
+                    update_status=$?
+                } & spinner $! "Updating SecLists to latest version (system-wide)"
+            else
+                {
+                    git -C "$install_location" pull
+                    update_status=$?
+                } & spinner $! "Updating SecLists to latest version (user directory)"
+            fi
             
             if [ $update_status -eq 0 ]; then
                 log_message "SecLists updated successfully" "success"
@@ -406,22 +554,62 @@ arch_tools_installer() {
 
     # Install ghauri
     # Check if ghauri is already working properly
-    if ! (command -v ghauri &>/dev/null && ghauri --help &>/dev/null); then
-        echo -e "\e[31mghauri is not installed. Now installing ghauri....\e[0m"
-        git clone https://github.com/r0oth3x49/ghauri.git ~/Tools/ghauri
+    if ! (command -v ghauri &>/dev/null && ghauri --help &>/dev/null 2>&1); then
+        echo -e "\e[31mghauri is not installed or not working properly. Setting up ghauri...\e[0m"
+        
+        # Save current directory
+        CURRENT_DIR=$(pwd)
+        
+        # Check if directory exists
+        if [ ! -d "$HOME/Tools/ghauri" ]; then
+            # If not, clone the repository
+            git clone https://github.com/r0oth3x49/ghauri.git ~/Tools/ghauri
+        else
+            # If directory exists, update the repository
+            cd "$HOME/Tools/ghauri" || {
+                log_message "Failed to change to ghauri directory" "error"
+                return 1
+            }
+            # Pull latest changes if it's a git repository
+            if [ -d ".git" ]; then
+                git pull
+            fi
+        fi
         
         # Create and use virtual environment for ghauri
-        python3 -m venv ~/Tools/ghauri/venv
-        source ~/Tools/ghauri/venv/bin/activate
-        pip install setuptools
-        pip install -r ~/Tools/ghauri/requirements.txt
-        python ~/Tools/ghauri/setup.py install
+        if [ ! -d "$HOME/Tools/ghauri/venv" ]; then
+            python3 -m venv ~/Tools/ghauri/venv
+        fi
         
-        # Create a symlink to make it accessible
-        sudo ln -sf ~/Tools/ghauri/venv/bin/ghauri /usr/local/bin/ghauri
+        # Activate venv and install
+        source ~/Tools/ghauri/venv/bin/activate
+        pip install --upgrade pip setuptools
+        
+        if [ -f "$HOME/Tools/ghauri/requirements.txt" ]; then
+            pip install -r ~/Tools/ghauri/requirements.txt
+        fi
+        
+        if [ -f "$HOME/Tools/ghauri/setup.py" ]; then
+            python ~/Tools/ghauri/setup.py install
+        fi
         deactivate
+        
+        # Create wrapper script
+        echo '#!/bin/bash' > ~/Tools/ghauri/ghauri_wrapper.sh
+        echo 'source ~/Tools/ghauri/venv/bin/activate' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        echo '~/Tools/ghauri/venv/bin/python -m ghauri "$@"' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        echo 'deactivate' >> ~/Tools/ghauri/ghauri_wrapper.sh
+        chmod +x ~/Tools/ghauri/ghauri_wrapper.sh
+        
+        # Create symlink
+        sudo ln -sf ~/Tools/ghauri/ghauri_wrapper.sh /usr/local/bin/ghauri
+        
+        # Return to original directory
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+        
+        echo -e "\e[32mghauri has been set up successfully\e[0m"
     else
-        echo -e "\e[32mghauri is already installed\e[0m"
+        echo -e "\e[32mghauri is already installed and working properly\e[0m"
     fi
 
     # Install waymore
@@ -453,34 +641,99 @@ arch_tools_installer() {
 
     # Install creepyCrawler
     # Check if creepyCrawler is already working properly
-    if command -v creepycrawler &>/dev/null && [ -f "$HOME/Tools/creepyCrawler/creepyCrawler.py" ]; then
+    if command -v creepycrawler &>/dev/null && [ -f "$HOME/Tools/creepyCrawler/creepyCrawler.py" ] && creepycrawler -h &>/dev/null 2>&1; then
         echo -e "\e[32mcreepyCrawler is already installed and working properly.\e[0m"
     else
-        echo -e "\e[31mNow installing creepyCrawler...\e[0m"
-        git clone https://github.com/chm0dx/creepyCrawler.git ~/Tools/creepyCrawler
+        echo -e "\e[31mInstalling or fixing creepyCrawler...\e[0m"
         
-        # Create and use virtual environment for creepyCrawler
-        python3 -m venv ~/Tools/creepyCrawler/venv
+        # Save current directory
+        CURRENT_DIR=$(pwd)
+        
+        # Check if directory exists
+        if [ ! -d "$HOME/Tools/creepyCrawler" ]; then
+            # Clone repository if it doesn't exist
+            git clone https://github.com/chm0dx/creepyCrawler.git ~/Tools/creepyCrawler
+        else
+            # Update existing repository
+            cd "$HOME/Tools/creepyCrawler" || {
+                log_message "Failed to change to creepyCrawler directory" "error"
+                return 1
+            }
+            # Pull latest changes if it's a git repository
+            if [ -d ".git" ]; then
+                git pull
+            fi
+        fi
+        
+        # Create virtual environment if it doesn't exist
+        if [ ! -d "$HOME/Tools/creepyCrawler/venv" ]; then
+            python3 -m venv ~/Tools/creepyCrawler/venv
+        fi
+        
+        # Install requirements
         source ~/Tools/creepyCrawler/venv/bin/activate
-        pip install -r ~/Tools/creepyCrawler/requirements.txt
+        pip install --upgrade pip setuptools
+        if [ -f "$HOME/Tools/creepyCrawler/requirements.txt" ]; then
+            pip install -r ~/Tools/creepyCrawler/requirements.txt
+        fi
         deactivate
         
+        # Ensure script is executable
         chmod +x ~/Tools/creepyCrawler/creepyCrawler.py
-        # Create wrapper script for creepyCrawler
+        
+        # Create wrapper script
         echo '#!/bin/bash' > ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
         echo 'source ~/Tools/creepyCrawler/venv/bin/activate' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
         echo 'python ~/Tools/creepyCrawler/creepyCrawler.py "$@"' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
         echo 'deactivate' >> ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
         chmod +x ~/Tools/creepyCrawler/creepycrawler_wrapper.sh
+        
+        # Create symlink
+        sudo ln -sf ~/Tools/creepyCrawler/creepycrawler_wrapper.sh /usr/local/bin/creepycrawler
+        
+        # Return to original directory
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+        
+        echo -e "\e[32mcreepyCrawler has been set up successfully\e[0m"
     fi
 
     # Install ffuf
     if ! command -v ffuf &>/dev/null; then
         echo -e "\e[31mffuf not installed. Now installing ffuf\e[0m"
-        # Check if yay is installed (AUR helper)
-        if command -v yay &>/dev/null; then
-            yay -S --noconfirm ffuf
-        else
+        # Install ffuf manually from GitHub
+        log_message "Installing ffuf manually from GitHub release" "info"
+        # Make sure wget and unzip are installed
+        if ! check_command "wget"; then
+            run_command "sudo pacman -S --noconfirm wget" "Failed to install wget" "Wget installed"
+        fi
+        if ! check_command "unzip"; then
+            run_command "sudo pacman -S --noconfirm unzip" "Failed to install unzip" "Unzip installed"
+        fi
+        
+        # Create a temp directory for the download
+        TMP_DIR=$(mktemp -d)
+        # Save current directory
+        CURRENT_DIR=$(pwd)
+        cd "$TMP_DIR" || {
+            log_message "Failed to create temporary directory for ffuf download" "error"
+            return 1
+        }
+        
+        # Download and install ffuf
+        run_command "wget https://github.com/ffuf/ffuf/releases/download/v2.0.0/ffuf_2.0.0_linux_amd64.tar.gz" \
+            "Failed to download ffuf" \
+            "Downloaded ffuf successfully"
+            
+        run_command "tar -xf ffuf_2.0.0_linux_amd64.tar.gz" "Failed to extract ffuf" "Extracted ffuf"
+        run_command "chmod +x ffuf" "Failed to set executable permissions on ffuf" "Set permissions on ffuf"
+        run_command "sudo mv ffuf /usr/local/bin" "Failed to install ffuf to /usr/local/bin" "Moved ffuf to /usr/local/bin"
+        # Return to original directory before cleaning up
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
+        run_command "rm -rf $TMP_DIR" "Failed to clean up temporary files" "Cleaned up temporary files"
+        
+        # As a fallback, if the manual installation fails, install using Go
+        if ! check_command "ffuf"; then
+            log_message "Manual installation failed, trying Go installation..." "warning"
             # Install Go if not already installed
             if ! command -v go &>/dev/null; then
                 sudo pacman -S --noconfirm --noprogressbar --needed go || echo "Go installation failed, continuing..."
@@ -540,9 +793,19 @@ arch_tools_installer() {
                 "Cloned WPScan repository successfully"
         else
             log_message "Updating WPScan repository..." "info"
-            run_command "cd $HOME/Tools/wpscan && git pull" \
+            # Save current directory
+            CURRENT_DIR=$(pwd)
+            # Change to WPScan directory
+            cd "$HOME/Tools/wpscan" || {
+                log_message "Failed to change to WPScan directory" "error"
+                return 1
+            }
+            # Pull latest changes
+            run_command "git pull" \
                 "Failed to update WPScan repository" \
                 "Updated WPScan repository successfully"
+            # Return to original directory
+            cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
         fi
         
         # Store the current directory to return to it later
@@ -737,10 +1000,13 @@ fix_existing_installations() {
     fi
     
     # Fix paramspider if it exists but doesn't work
-    if [ -d "$HOME/Tools/ParamSpider" ] && ! paramspider -h &>/dev/null; then
+    if [ -d "$HOME/Tools/ParamSpider" ] && ! paramspider -h &>/dev/null 2>&1; then
         echo -e "\e[31mFixing paramspider installation...\e[0m"
         
-        # Ensure virtual environment exists
+        # Save current directory
+        CURRENT_DIR=$(pwd)
+        
+        # Create virtual environment if it doesn't exist
         if [ ! -d "$HOME/Tools/ParamSpider/venv" ]; then
             python3 -m venv ~/Tools/ParamSpider/venv
         fi
@@ -748,6 +1014,9 @@ fix_existing_installations() {
         # Install in virtual environment
         source ~/Tools/ParamSpider/venv/bin/activate
         pip install setuptools
+        if [ -f "$HOME/Tools/ParamSpider/requirements.txt" ]; then
+            pip install -r ~/Tools/ParamSpider/requirements.txt
+        fi
         if [ -f "$HOME/Tools/ParamSpider/setup.py" ]; then
             python ~/Tools/ParamSpider/setup.py install
         fi
@@ -762,11 +1031,17 @@ fix_existing_installations() {
         
         # Update symlink
         sudo ln -sf ~/Tools/ParamSpider/paramspider_wrapper.sh /usr/local/bin/paramspider
+        
+        # Return to original directory
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
     fi
     
     # Fix waymore if it exists but doesn't work
-    if [ -d "$HOME/Tools/waymore" ] && ! waymore -h &>/dev/null; then
+    if [ -d "$HOME/Tools/waymore" ] && ! waymore -h &>/dev/null 2>&1; then
         echo -e "\e[31mFixing waymore installation...\e[0m"
+        
+        # Save current directory
+        CURRENT_DIR=$(pwd)
         
         # Ensure virtual environment exists
         if [ ! -d "$HOME/Tools/waymore/venv" ]; then
@@ -793,6 +1068,9 @@ fix_existing_installations() {
         
         # Update symlink
         sudo ln -sf ~/Tools/waymore/waymore_wrapper.sh /usr/local/bin/waymore
+        
+        # Return to original directory
+        cd "$CURRENT_DIR" || log_message "Failed to return to original directory" "warning"
     fi
 }
 

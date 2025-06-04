@@ -1,6 +1,0 @@
-requests
-pyyaml
-termcolor
-psutil
-urlparse3
-tldextract

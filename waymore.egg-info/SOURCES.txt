@@ -1,7 +1,0 @@
-README.md
-waymore.egg-info/PKG-INFO
-waymore.egg-info/SOURCES.txt
-waymore.egg-info/dependency_links.txt
-waymore.egg-info/entry_points.txt
-waymore.egg-info/requires.txt
-waymore.egg-info/top_level.txt

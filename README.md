@@ -32,6 +32,7 @@ This tool simplifies the installation process for various security tools used in
 - **Naabu**: Fast port scanner
 - **Nuclei**: Vulnerability scanner
 - **Httpx**: HTTP toolkit
+- **AWS CLI**: Amazon Web Services Command Line Interface
 
 ### Reconnaissance Tools
 - **Subfinder**: Subdomain discovery tool

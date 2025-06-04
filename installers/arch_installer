@@ -383,7 +383,32 @@ arch_tools_installer() {
         echo -e "\e[32mInstalled sqlmap version: $SQLMAP_VERSION\e[0m"
     fi
     
-    # Install SecLists wordlists collection
+    # Install AWS CLI using pacman
+    display_section "INSTALLING AWS CLI"
+    
+    # Check if AWS CLI is already installed
+    if command -v aws &>/dev/null; then
+        echo -e "\e[32mAWS CLI is already installed...\e[0m"
+        # Display the installed version
+        AWS_VERSION=$(aws --version 2>&1)
+        echo -e "\e[32mInstalled AWS CLI version: $AWS_VERSION\e[0m"
+    else
+        echo -e "\e[31mAWS CLI not installed. Installing AWS CLI via pacman...\e[0m"
+        if ! sudo pacman -S --noconfirm --noprogressbar --needed aws-cli; then
+            log_message "Failed to install AWS CLI via pacman" "error"
+        else
+            log_message "AWS CLI installed successfully via pacman" "success"
+            # Verify the installation worked
+            if command -v aws &>/dev/null; then
+                AWS_VERSION=$(aws --version 2>&1)
+                log_message "Installed AWS CLI version: $AWS_VERSION" "info"
+            else
+                log_message "AWS CLI was installed but command not found. You may need to restart your terminal." "warning"
+            fi
+        fi
+    fi
+    
+    # Install SecListiss wordlists collection
     display_section "INSTALLING SECLISTS WORDLISTS"
     
     # Define both system and user locations for SecLists

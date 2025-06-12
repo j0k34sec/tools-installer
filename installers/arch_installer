@@ -982,7 +982,7 @@ EOF
     fi
 
     # Calling go tool for installation
-    ./go_tool_installer.sh
+    ./installers/go_tool_installer.sh
     
     # Install python-setuptools if not already installed
     if ! pacman -Q python-setuptools &>/dev/null; then

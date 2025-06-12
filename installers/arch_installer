@@ -346,22 +346,30 @@ arch_tools_installer() {
         echo -e "\e[32mXSStrike is already installed and working properly.\e[0m"
     else
         echo -e "\e[31mXSStrike not installed. Now installing XSStrike....\e[0m"
-        git clone https://github.com/s0md3v/XSStrike.git ~/Tools/XSStrike
-        
-        # Create and use virtual environment for XSStrike
-        python3 -m venv ~/Tools/XSStrike/venv
-        source ~/Tools/XSStrike/venv/bin/activate
-        pip install -r ~/Tools/XSStrike/requirements.txt
-        deactivate
-        
-        chmod +x ~/Tools/XSStrike/xsstrike.py
-        # Create wrapper script for XSStrike
-        echo '#!/bin/bash' > ~/Tools/XSStrike/xsstrike_wrapper.sh
-        echo 'source ~/Tools/XSStrike/venv/bin/activate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
-        echo 'python ~/Tools/XSStrike/xsstrike.py "$@"' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
-        echo 'deactivate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
-        chmod +x ~/Tools/XSStrike/xsstrike_wrapper.sh
-        echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
+        if [ -d "$HOME/Tools/XSStrike" ]; then
+            echo -e "\e[31mXSStrike is already installed. Skipping...\e[0m"
+        else
+            git clone https://github.com/s0md3v/XSStrike.git ~/Tools/XSStrike
+            
+            # Create and use virtual environment for XSStrike
+            python3 -m venv ~/Tools/XSStrike/venv
+            source ~/Tools/XSStrike/venv/bin/activate
+            pip install -r ~/Tools/XSStrike/requirements.txt
+            deactivate
+            
+            chmod +x ~/Tools/XSStrike/xsstrike.py
+            # Create wrapper script for XSStrike
+            echo '#!/bin/bash' > ~/Tools/XSStrike/xsstrike_wrapper.sh
+            echo 'source ~/Tools/XSStrike/venv/bin/activate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+            echo 'python ~/Tools/XSStrike/xsstrike.py "$@"' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+            echo 'deactivate' >> ~/Tools/XSStrike/xsstrike_wrapper.sh
+            chmod +x ~/Tools/XSStrike/xsstrike_wrapper.sh
+            
+            # Create symlink
+            sudo ln -sf ~/Tools/XSStrike/xsstrike_wrapper.sh /usr/local/bin/xsstrike
+            
+            echo -e "\e[31mXSStrike is now installed in ~/Tools\e[0m"
+        fi
     fi
 
     # Install sqlmap using pacman (package manager)
@@ -639,7 +647,7 @@ arch_tools_installer() {
 
     # Install waymore
     # Check if waymore is already working properly
-    if ! (command -v waymore &>/dev/null && waymore -h &>/dev/null); then
+    if ! (command -v waymore &>/dev/null && waymore -h &>/dev/null 2>&1); then
         echo -e "\e[31mwaymore is not installed. Now installing waymore...\e[0m"
         git clone https://github.com/xnl-h4ck3r/waymore.git ~/Tools/waymore
         

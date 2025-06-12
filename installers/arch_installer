@@ -285,7 +285,7 @@ arch_tools_installer() {
 
     # Install paramspider
     # Check if paramspider is already working properly
-    if ! (command -v paramspider &>/dev/null && paramspider -h &>/dev/null); then
+    if ! (command -v paramspider &>/dev/null && paramspider -h &>/dev/null 2>&1); then
         echo -e "\e[31mparamspider is not installed. Now installing paramspider...\e[0m"
         # Make sure Tools directory exists
         mkdir -p ~/Tools
@@ -974,7 +974,7 @@ EOF
     fi
 
     # Calling go tool for installation
-    "$HOME/test/tools-installer/installers/go_tool_installer.sh"
+    ./installers/go_tool_installer.sh
     
     # Install python-setuptools if not already installed
     if ! pacman -Q python-setuptools &>/dev/null; then

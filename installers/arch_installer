@@ -780,8 +780,8 @@ arch_tools_installer() {
 
     # Install SSRFmap
     # Check if SSRFmap is already working properly
-    if command -v ssrfmap &>/dev/null && [ -f "$HOME/Tools/SSRFmap/ssrfmap.py" ]; then
-        echo -e "\e[32mSSRFmap is already installed and working properly.\e[0m"
+    if [ -d "$HOME/Tools/SSRFmap" ]; then
+        echo -e "\e[32mSSRFmap is already installed. Skipping...\e[0m"
     else
         echo -e "\e[31mSSRFmap Now installing....\e[0m"
         git clone https://github.com/swisskyrepo/SSRFmap.git ~/Tools/SSRFmap/
